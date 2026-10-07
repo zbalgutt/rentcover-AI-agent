@@ -23,6 +23,10 @@ Every tool validates its inputs and returns errors as JSON with an instruction f
 
 ## Sample queries
 
+Try it with a real listing (recommended): open any property on Auction.com, Zillow or Redfin, press Ctrl+A then Ctrl+C (⌘A, ⌘C on a Mac) to copy the whole page, paste it into the chat box and press Check. The agent pulls the address, price or opening bid, beds, baths, square footage, year built, occupancy and estimated value out of the page and runs the full report. If the listing has no estimated value and you are using Cash → refinance, it will ask what the house would be worth after renovation.
+
+Or type one of these:
+
 1. `3 bed in 46201 listed at $120,000, 1,300 sq ft, built 1960. I want to renovate it to a luxury standard and charge above median rent. 25% down. Will the rent cover my mortgage?` (set the financing switch to Mortgage)
 2. `Auction opening bid is $85,000 for a 2 bed in 44105, 1,100 sq ft, built 1925. Vacant for years and the roof is sagging. 20% down at 7.25%. Does the rent cover the loan?` (set the financing switch to Mortgage)
 3. `Price $150,000, rent $1,600, 6.9% rate, 25% down, taxes $2,400 a year. How much is left over each month?` (set the financing switch to Mortgage)
