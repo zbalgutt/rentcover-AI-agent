@@ -30,17 +30,6 @@ Every tool validates its inputs and returns errors as JSON with an instruction f
 
 Follow up example in the same session: `What if I put 35% down instead?`
 
-## Running locally
-
-```bash
-uv sync
-export CENSUS_API_KEY=your_key   # free at https://api.census.gov/data/key_signup.html
-export FRED_API_KEY=your_key     # free at https://fredaccount.stlouisfed.org/apikeys
-uv run app.py
-```
-
-Then open http://127.0.0.1:8000. On Cloud Run, set `CENSUS_API_KEY` and `FRED_API_KEY` under Variables & Secrets. Without a FRED key the rate tool falls back to FRED's public CSV download, and if both fail the agent asks the user for their quoted rate.
-
 ## Assumptions and limits
 
 Defaults are 25% down, no HOA fee (the agent flags a missing fee for condos), a 30 year fixed loan, 8% vacancy, 10% management, 10% maintenance reserve, $2,000 taxes, $1,500 insurance, a 5% buyer's premium for auctions (0 for regular sales), 3% closing costs, 4 months to get the unit rented, 2.5% yearly growth in rent and in taxes, insurance and HOA, and no appreciation (to keep the timeline conservative). The user can override any of them in conversation. Census rents are medians that include utilities and lag the current market. The Freddie Mac rate is a national average for owner occupied homes, so the agent adjusts it up. Many auctions require cash or proof of funds, which is why cash then refinance is the default. Refinance results depend on the appraisal matching the after repair value and on each lender's rules for loan to value, rent coverage and seasoning, which vary. Repair tiers and the luxury upgrade cost are rough rules of thumb that vary by market. The upper quartile rent describes existing rentals in the ZIP, so a truly new luxury unit could rent higher; the agent only goes above it when the user supplies comps. This is an educational tool, not financial advice.
