@@ -55,8 +55,9 @@ How to work:
    luxury_upgrade_mid as luxury_upgrade_cost for Luxury. If the user gave their own repair figure, use it
    for Standard and add luxury_upgrade_mid for Luxury. With no square footage, use the user's figure or 0
    and say the upfront cash excludes repairs. Do not hold up the answer for repairs.
-5. Always run the cash flow analysis for each plan before giving any opinion. For Luxury, also pass
-   market_median_rent (the Census median) and luxury_upgrade_cost.
+5. Always run the cash flow analysis for each plan before giving any opinion: that is TWO calls, one
+   for Standard and one for Luxury, plus one stress test for each (unless the Luxury plan is skipped).
+   Pass market_median_rent and luxury_upgrade_cost only on the Luxury call, never on the Standard call.
 6. HOA: only for condos and townhomes, pass hoa_monthly from the listing. If a condo or townhome has no
    fee listed, use 0 and add a "Watch out" bullet that the fee is missing. Never mention HOA fees for a
    single family house.
@@ -205,16 +206,26 @@ def plan_of(args: dict) -> str:
 
 def report_tables(tool_calls: list[dict]) -> str:
     """Markdown tables comparing the Standard and Luxury analyses run this turn (empty if none ran)."""
-    plans = {}
-    for c in tool_calls:  # later calls replace earlier ones for the same plan
+    # Successful analyses this turn, keyed by (rent, repairs); a rerun of the same plan replaces the earlier one
+    found = {}
+    for c in tool_calls:
         try:
             result = json.loads(c["result"])
         except (ValueError, TypeError):
             continue
         if c["name"] in ANALYSES and "error" not in result:
-            plans[plan_of(c["args"])] = {"name": c["name"], "args": c["args"], "result": result, "stress": None}
-    if not plans:
+            key = (float(c["args"].get("monthly_rent") or 0), float(c["args"].get("repair_cost") or 0))
+            found[key] = {"name": c["name"], "args": c["args"], "result": result, "stress": None}
+    if not found:
         return ""
+    # Label by the numbers, not by which optional arguments the model happened to pass:
+    # with two or more analyses, the lowest rent and repairs is Standard and the highest is Luxury.
+    keys = sorted(found)
+    if len(keys) >= 2:
+        plans = {"Standard": found[keys[0]], "Luxury": found[keys[-1]]}
+    else:
+        only = found[keys[0]]
+        plans = {plan_of(only["args"]): only}
     for c in tool_calls:  # attach each stress test to the plan with the same rent and repairs
         if c["name"] != "stress_test_cash_flow":
             continue
@@ -324,6 +335,54 @@ def add_tables(response: str, tool_calls: list[dict]) -> str:
     return first + "\n\n" + tables + ("\n\n" + rest if rest else "")
 
 
+def latest_result(messages: list[dict], tool_name: str) -> dict | None:
+    """Most recent successful result of a tool in this session."""
+    names = {}
+    for m in messages:
+        for call in m.get("tool_calls") or []:
+            names[call["id"]] = call["function"]["name"]
+    for m in reversed(messages):
+        if m.get("role") == "tool" and names.get(m.get("tool_call_id")) == tool_name:
+            try:
+                result = json.loads(m["content"])
+            except (ValueError, TypeError):
+                continue
+            if "error" not in result:
+                return result
+    return None
+
+
+def align_analysis(args: dict, messages: list[dict]) -> dict:
+    """Give the Luxury analysis its luxury inputs and keep them off the Standard one.
+
+    Whether a call is Luxury is decided from the rent lookup already in the conversation (rent at or
+    above the top quarter rent), not from which optional arguments the model remembered to pass.
+    """
+    rent_info = latest_result(messages, "lookup_market_rent")
+    if not rent_info or args.get("monthly_rent") is None:
+        return args
+    median = rent_info.get("median_rent_for_bedrooms") or rent_info.get("median_rent_all_units")
+    top = rent_info.get("upper_quartile_rent_for_bedrooms")
+    rent = float(args["monthly_rent"])
+    luxury = (top is not None and rent >= top - 1) or (
+        (args.get("luxury_upgrade_cost") or 0) > 0 and median is not None and rent > median)
+    aligned = dict(args)
+    if luxury:
+        if median:
+            aligned["market_median_rent"] = median
+        repairs = latest_result(messages, "estimate_repairs")
+        if not aligned.get("luxury_upgrade_cost") and repairs:
+            aligned["luxury_upgrade_cost"] = repairs.get("luxury_upgrade_mid") or \
+                repairs.get("both_finishes", {}).get("luxury_upgrade_mid", 0)
+        # A "luxury value" equal to the standard value is not a real override
+        if aligned.get("luxury_after_repair_value") == aligned.get("after_repair_value"):
+            aligned.pop("luxury_after_repair_value", None)
+    else:
+        for key in ("luxury_upgrade_cost", "luxury_after_repair_value"):
+            aligned.pop(key, None)
+    return aligned
+
+
 def run_agent(messages: list[dict]) -> tuple[str, list[dict]]:
     """Complete until the model answers without asking for a tool.
 
@@ -359,6 +418,8 @@ def run_agent(messages: list[dict]) -> tuple[str, list[dict]]:
             else:
                 if call.function.name == "stress_test_cash_flow":
                     args = align_stress_test(args, messages)
+                elif call.function.name in ANALYSES:
+                    args = align_analysis(args, messages)
                 result = run_tool(call.function.name, args)
             tool_calls += [{"name": call.function.name, "args": args, "result": result}]
 
