@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentCover · Will the rent cover the loan?</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f1ea; --panel: #fffdf8; --ink: #1d1b16; --muted: #6b665b;
+    --line: #ddd6c6; --accent: #b4441c; --accent-soft: #f6e3d9;
+    --good: #2f6b3a; --tool: #efeadf;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px;
+          display: grid; grid-template-columns: 320px 1fr; gap: 24px; min-height: 100vh; }
+  aside h1 { font-family: "IBM Plex Mono", monospace; font-size: 28px; margin: 0;
+             letter-spacing: -0.5px; }
+  aside h1 span { color: var(--accent); }
+  .tag { color: var(--muted); margin: 6px 0 20px; line-height: 1.5; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+             color: var(--muted); margin: 0 0 10px; }
+  .card ol { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 14px; }
+  .sample { display: block; width: 100%; text-align: left; background: var(--accent-soft);
+            border: 1px solid transparent; border-radius: 8px; padding: 10px; margin-bottom: 8px;
+            font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .sample:hover { border-color: var(--accent); }
+  .tip { display: block; width: 100%; text-align: left; background: var(--panel); border: 1px dashed var(--accent);
+         border-radius: 8px; padding: 10px; margin-bottom: 8px; font: inherit; font-size: 13px;
+         color: var(--ink); cursor: pointer; line-height: 1.5; }
+  .tip:hover { background: var(--accent-soft); }
+  .tip strong { display: block; margin-bottom: 2px; }
+  .fine { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  main { display: flex; flex-direction: column; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 10px; min-height: 80vh; }
+  .top { display: flex; justify-content: space-between; align-items: center;
+         padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .plan { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-left: 10px; }
+  .plan button { border: 0; border-radius: 0; padding: 6px 12px; background: none; color: var(--muted); }
+  .plan button.on { background: var(--ink); color: var(--panel); }
+  .top { flex-wrap: wrap; gap: 8px; }
+  .top button { background: none; border: 1px solid var(--line); border-radius: 6px;
+                padding: 6px 10px; font: inherit; cursor: pointer; color: var(--ink); }
+  #log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 10px; line-height: 1.55;
+         white-space: pre-wrap; font-size: 15px; }
+  .user { align-self: flex-end; background: var(--ink); color: var(--panel); }
+  .msg.report { white-space: normal; width: 85%; background: var(--panel); border: 1px solid var(--line); }
+  .report h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent);
+               margin: 18px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .report h3:first-child { margin-top: 4px; }
+  .report table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .report td, .report th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .report th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
+  .report td:first-child { color: var(--muted); width: 34%; }
+  .report td:not(:first-child) { font-weight: 500; }
+  .report p { margin: 6px 0; }
+  .report ul { margin: 6px 0; padding-left: 20px; }
+  .bot { align-self: flex-start; background: var(--bg); }
+  .empty { margin: auto; text-align: center; color: var(--muted); max-width: 420px; line-height: 1.6; }
+  .tools { align-self: flex-start; width: 85%; display: flex; flex-direction: column; gap: 6px; }
+  details.tc { background: var(--tool); border-left: 3px solid var(--accent); border-radius: 6px;
+               font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  details.tc.err { border-left-color: #8a1c1c; }
+  details.tc summary { padding: 8px 10px; cursor: pointer; }
+  details.tc pre { margin: 0; padding: 0 10px 10px; white-space: pre-wrap; word-break: break-word; }
+  .kpi { color: var(--good); font-weight: 600; }
+  details.tc.err .kpi { color: #8a1c1c; }
+  form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  input { flex: 1; padding: 12px; border: 1px solid var(--line); border-radius: 8px;
+          font: inherit; background: #fff; }
+  form button { background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+                padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  form button:disabled { opacity: 0.5; }
+  @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <h1>Rent<span>Cover</span></h1>
+    <p class="tag">Will the rent pay your mortgage, and how much is left over each month?</p>
+
+    <div class="card">
+      <h2>How it works</h2>
+      <ol>
+        <li>Tell it the price, ZIP and bedrooms, plus your down payment and rate if you know them. Pasting the listing text works too.</li>
+        <li>It pulls local rent from US Census data and this week's mortgage rate from Freddie Mac.</li>
+        <li>It estimates repairs from size, age and condition, and compares a standard renovation at median rent with a luxury renovation at top quarter rent, side by side.</li>
+        <li>It lines up rent against the mortgage, taxes, insurance, vacancy and upkeep to show what's left each month.</li>
+        <li>It runs 5,000 simulations of lower rent, vacancy and cost spikes to show how likely you are to come up short, and how much cash you'd need if things go wrong.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Try one</h2>
+      <button class="tip" id="paste-tip" type="button">
+        <strong>📋 Paste an Auction.com listing</strong>
+        Open a listing on Auction.com, press Ctrl+A then Ctrl+C (⌘A, ⌘C on a Mac), and paste the whole page into the box below.
+      </button>
+      <button class="sample">3 bed in 46201 listed at $120,000, 1,300 sq ft, built 1960. I want to renovate it to a luxury standard and charge above median rent. 25% down. Will the rent cover my mortgage?</button>
+      <button class="sample">Auction opening bid is $85,000 for a 2 bed in 44105, 1,100 sq ft, built 1925. Vacant for years and the roof is sagging. 20% down at 7.25%. Does the rent cover the loan?</button>
+      <button class="sample">Price $150,000, rent $1,600, 6.9% rate, 25% down, taxes $2,400 a year. How much is left over each month?</button>
+      <button class="sample">Buying a 3 bed in 46201 at auction for $90,000 cash, 1,300 sq ft, built 1960. Renovated it should be worth about $175,000. I'll refinance after 6 months. Will the rent cover the new loan, and how much of my cash do I get back?</button>
+    </div>
+
+    <p class="fine">Educational tool, not financial advice. Census rents are medians that lag the market; the national mortgage rate is adjusted up for rental loans.</p>
+  </aside>
+
+  <main>
+    <div class="top">
+      <span><span id="status">New session</span>
+        <span class="plan" role="group" aria-label="Financing plan">
+          <button type="button" data-financing="mortgage">Mortgage</button>
+          <button type="button" data-financing="cash_refi" class="on">Cash → refinance</button>
+        </span>
+      </span>
+      <button id="reset">New property</button>
+    </div>
+    <div id="log">
+      <div class="empty" id="empty">Describe a property and your loan to get started, or pick an example on the left. Every tool call the agent makes shows up here so you can check its math.</div>
+    </div>
+    <form id="form">
+      <input id="input" autocomplete="off" placeholder="e.g. 3 bed in 46201 at $120,000, 25% down. Does rent cover the loan?">
+      <button id="send">Check</button>
+    </form>
+  </main>
+</div>
+
+<script>
+  let sessionId = null;
+  const log = document.getElementById("log");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const status = document.getElementById("status");
+
+  const money = n => "$" + Math.round(n).toLocaleString();
+
+  // Financing switch: sent with every message so the agent always knows how the purchase is paid for
+  let financing = "cash_refi";
+  document.querySelectorAll(".plan button").forEach(b => b.addEventListener("click", () => {
+    financing = b.dataset.financing;
+    b.parentElement.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  }));
+
+  function add(cls, text) {
+    document.getElementById("empty")?.remove();
+    const d = document.createElement("div");
+    d.className = "msg " + cls;
+    d.textContent = text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  // Render the agent's Markdown report as formatted HTML, sanitized so model output can't inject scripts.
+  function addBot(text) {
+    if (!window.marked || !window.DOMPurify) return add("bot", text);  // CDN blocked: fall back to plain text
+    const d = add("bot", "");
+    d.innerHTML = DOMPurify.sanitize(marked.parse(text));
+    if (d.querySelector("h3, table")) d.classList.add("report");
+    // Hide header rows that are empty (two column tables); keep "Standard | Luxury" headers
+    d.querySelectorAll("thead").forEach(h => { if (!h.textContent.trim()) h.remove(); });
+    return d;
+  }
+
+  function headline(name, r) {
+    if (r.error) return "error";
+    if (name === "lookup_market_rent")
+      return money(r.median_rent_for_bedrooms || r.median_rent_all_units) + "/mo median" +
+             (r.upper_quartile_rent_for_bedrooms ? " · top quarter " + money(r.upper_quartile_rent_for_bedrooms) : "");
+    if (name === "estimate_repairs")
+      return "repairs " + money(r.repair_estimate_low) + " to " + money(r.repair_estimate_high);
+    if (name === "get_mortgage_rate") return r.average_rate_pct + "% national average (" + r.as_of_week + ")";
+    if (name === "calculate_cash_flow") {
+      const cf = r.monthly.cash_flow;
+      const back = r.timeline && r.timeline.years_until_cash_back;
+      return (cf >= 0 ? money(cf) + "/mo left over" : money(-cf) + "/mo short") + " · DSCR " + r.debt_service_coverage_ratio +
+             " · cash back " + (back ? "in " + back + " yrs" : "not within 40 yrs");
+    }
+    if (name === "analyze_cash_then_refinance") {
+      const cf = r.monthly_after_refinance.cash_flow, left = r.cash_left_in_deal;
+      return (cf >= 0 ? money(cf) + "/mo after refi" : money(-cf) + "/mo short after refi") + " · " +
+             (left > 0 ? money(left) + " left in deal" : "all cash back");
+    }
+    if (name === "stress_test_cash_flow") {
+      const s = r.simulation;
+      return (s.prob_rent_does_not_cover_loan * 100).toFixed(0) + "% chance rent falls short · bad case cash " +
+             money(s.total_cash_needed_bad_case);
+    }
+    return "";
+  }
+
+  function showTools(calls) {
+    if (!calls.length) return;
+    const box = document.createElement("div");
+    box.className = "tools";
+    for (const c of calls) {
+      let r; try { r = JSON.parse(c.result); } catch { r = {}; }
+      const d = document.createElement("details");
+      d.className = "tc" + (r.error ? " err" : "");
+      d.innerHTML = `<summary>⚙ ${c.name} · <span class="kpi"></span></summary><pre></pre>`;
+      d.querySelector(".kpi").textContent = headline(c.name, r);
+      d.querySelector("pre").textContent =
+        "args: " + JSON.stringify(c.args, null, 2) + "\n\nresult: " + JSON.stringify(r, null, 2);
+      box.appendChild(d);
+    }
+    log.appendChild(box);
+  }
+
+  async function ask(text) {
+    if (!text.trim()) return;
+    add("user", text);
+    input.value = "";
+    send.disabled = true;
+    const thinking = add("bot", "Running the numbers…");
+    try {
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: sessionId, financing }),
+      });
+      const data = await res.json();
+      sessionId = data.session_id;
+      status.textContent = "Session " + sessionId.slice(0, 8);
+      thinking.remove();
+      showTools(data.tool_calls || []);
+      addBot(data.response || "(no response)");
+    } catch (e) {
+      thinking.textContent = "Could not reach the server: " + e.message;
+    } finally {
+      send.disabled = false;
+      input.focus();
+    }
+  }
+
+  document.getElementById("form").addEventListener("submit", e => { e.preventDefault(); ask(input.value); });
+  document.querySelectorAll(".sample").forEach(b => b.addEventListener("click", () => ask(b.textContent)));
+  // The paste tip doesn't send anything: it just points the user at the input box
+  document.getElementById("paste-tip").addEventListener("click", () => {
+    input.placeholder = "Paste the Auction.com listing page here, then press Check";
+    input.focus();
+  });
+  document.getElementById("reset").addEventListener("click", async () => {
+    if (sessionId) await fetch("/clear?session_id=" + encodeURIComponent(sessionId), { method: "POST" });
+    sessionId = null;
+    status.textContent = "New session";
+    log.innerHTML = '<div class="empty" id="empty">New property. Describe it to get started.</div>';
+  });
+</script>
+</body>
+</html>
