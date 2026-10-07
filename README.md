@@ -8,6 +8,11 @@ Every report compares two renovation plans side by side: **Standard** (standard 
 
 A switch at the top of the chat sets the financing and is sent with every message. **Cash → refinance** (the default) models the common auction strategy: buy with cash, renovate, rent it out, then refinance against the after repair value. The agent shows how much cash goes in, how big a loan a lender would likely give, how much cash comes back at the refinance, how much stays in the deal, and whether the rent covers the new loan. **Mortgage** models a normal purchase with a down payment.
 
+## Motivation
+I am thinking about investing in rental real estate in the future, and auction properties caught my attention because they can sell below market value. The catch is that auction buyers usually cannot inspect the house, often have to pay cash, and have little time to decide. Before spending money on inspections, lenders or contractors, I wanted a quick way to check whether a property is worth a closer look: will the rent cover the loan, how much of my cash would stay tied up, and what happens if things go worse than planned.
+
+My background is in actuarial work, so I built the analysis the way I would price a risk: start from conservative assumptions, then stress test them instead of trusting a single best guess. RentCover is meant for that first screen. It does not replace an inspection, an appraisal or a lender's quote, but it helps decide which properties deserve them.
+
 ## Tools
 
 | Tool | Type | What it does |
