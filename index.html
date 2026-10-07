@@ -79,6 +79,25 @@
                 padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer; }
   form button:disabled { opacity: 0.5; }
   @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } }
+  .print-btn { margin-top: 12px; background: none; border: 1px solid var(--line); border-radius: 6px;
+               padding: 6px 12px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .print-btn:hover { border-color: var(--accent); }
+  #print-area { display: none; }
+  /* Printing: show only the chosen report, laid out for paper */
+  @media print {
+    body.printing > *:not(#print-area) { display: none !important; }
+    body.printing { background: #fff; }
+    body.printing #print-area { display: block; color: #000; font-size: 12px; }
+    #print-area h1 { font-family: "IBM Plex Mono", monospace; font-size: 20px; margin: 0; }
+    #print-area .meta { color: #555; margin: 4px 0 14px; }
+    #print-area .question { border-left: 3px solid #b4441c; padding: 6px 10px; margin-bottom: 14px; color: #333; }
+    #print-area .report { border: 0; padding: 0; width: 100%; max-width: none; background: #fff; }
+    #print-area table { page-break-inside: avoid; break-inside: avoid; }
+    #print-area h3 { page-break-after: avoid; break-after: avoid; }
+    #print-area .print-btn { display: none; }
+    #print-area .foot { margin-top: 16px; color: #777; font-size: 10px; }
+    @page { margin: 16mm; }
+  }
 </style>
 </head>
 <body>
@@ -167,8 +186,43 @@
     if (d.querySelector("h3, table")) d.classList.add("report");
     // Hide header rows that are empty (two column tables); keep "Standard | Luxury" headers
     d.querySelectorAll("thead").forEach(h => { if (!h.textContent.trim()) h.remove(); });
+    if (d.classList.contains("report")) {
+      const btn = document.createElement("button");
+      btn.className = "print-btn";
+      btn.textContent = "🖨 Print report";
+      btn.addEventListener("click", () => printReport(d));
+      d.appendChild(btn);
+    }
     return d;
   }
+
+  // Copy one report (and the question that produced it) into a print-only area, then open the print dialog.
+  // "Save as PDF" in that dialog gives a PDF copy.
+  function printReport(reportEl) {
+    let question = reportEl.previousElementSibling;
+    while (question && !question.classList.contains("user")) question = question.previousElementSibling;
+    const area = document.getElementById("print-area");
+    area.innerHTML = "";
+    const h = document.createElement("h1"); h.textContent = "RentCover report";
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = new Date().toLocaleString() + " · Financing: " +
+      (financing === "cash_refi" ? "cash, then refinance" : "mortgage at purchase");
+    area.append(h, meta);
+    if (question) {
+      const q = document.createElement("div"); q.className = "question";
+      q.textContent = question.textContent.length > 400 ? question.textContent.slice(0, 400) + "…" : question.textContent;
+      area.append(q);
+    }
+    const copy = reportEl.cloneNode(true);
+    copy.querySelectorAll(".print-btn").forEach(b => b.remove());
+    area.append(copy);
+    const foot = document.createElement("div"); foot.className = "foot";
+    foot.textContent = "Estimates from Census rents, Freddie Mac rates and rules of thumb. Educational, not financial advice.";
+    area.append(foot);
+    document.body.classList.add("printing");
+    window.print();
+  }
+  window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
 
   function headline(name, r) {
     if (r.error) return "error";
@@ -254,5 +308,6 @@
     log.innerHTML = '<div class="empty" id="empty">New property. Describe it to get started.</div>';
   });
 </script>
+<div id="print-area"></div>
 </body>
 </html>
