@@ -203,6 +203,9 @@ CONDITION_PER_SQFT = {
 # Extra cost per square foot (low, high) to finish to a higher end standard on top of the repairs:
 # quartz counters, better cabinets and appliances, tile, fixtures, lighting. Rough rule of thumb.
 LUXURY_UPGRADE_PER_SQFT = (25, 60)
+# Share of the luxury upgrade cost assumed to show up in the home's value (renovations rarely add their
+# full cost). Rough rule of thumb used for the cost based luxury value estimate.
+LUXURY_VALUE_RECOVERY = 0.70
 
 # Major systems the tiers do NOT include. (low, high) dollars per item.
 ISSUE_COSTS = {
@@ -745,8 +748,25 @@ def analyze_cash_then_refinance(**args) -> str:
         refi_closing_pct = _num(args.get("refinance_closing_pct", 0.02), "refinance_closing_pct", minimum=0, maximum=0.1)
         refi_month = _num(args.get("months_until_refinance", 6), "months_until_refinance", minimum=1, maximum=36)
         a = _assumptions(args)
+        median = args.get("market_median_rent")
+        upgrade = _num(args.get("luxury_upgrade_cost", 0), "luxury_upgrade_cost", minimum=0)
+        user_lux_value = args.get("luxury_after_repair_value")
+        if user_lux_value is not None:
+            user_lux_value = _num(user_lux_value, "luxury_after_repair_value", minimum=1000)
     except ValueError as e:
         return _err(str(e))
+
+    # Luxury plan: the finished house should be worth more than the standard renovation.
+    standard_arv = arv
+    value_method = "as given"
+    if user_lux_value is not None:
+        arv, value_method = user_lux_value, "your luxury value"
+    elif upgrade > 0 and median and float(median) > 0 and rent > float(median):
+        income_based = standard_arv * rent / float(median)            # value moves with rent
+        cost_based = standard_arv + LUXURY_VALUE_RECOVERY * upgrade   # finishes rarely add their full cost
+        arv = max(standard_arv, min(income_based, cost_based))
+        value_method = ("lower of rent based (standard value x luxury rent / median rent) and cost based "
+                        f"(standard value + {LUXURY_VALUE_RECOVERY:.0%} of the luxury upgrade) estimates")
 
     costs = _monthly_costs(rent, a)
     fixed_monthly = costs["property_taxes"] + costs["insurance"] + costs["hoa_or_condo_fee"]
@@ -810,6 +830,8 @@ def analyze_cash_then_refinance(**args) -> str:
         },
         "phase_2_refinance": {
             "after_repair_value": round(arv),
+            "standard_after_repair_value": round(standard_arv),
+            "after_repair_value_method": value_method,
             "loan_amount": round(loan),
             "what_limited_the_loan": binding,
             "loan_limits": {k: round(v) for k, v in limits.items()},
@@ -970,7 +992,8 @@ TOOLS = [
                 "properties": {
                     "purchase_price": _LOAN_PROPS["purchase_price"],
                     "monthly_rent": _LOAN_PROPS["monthly_rent"],
-                    "after_repair_value": {"type": "number", "description": "Value after renovation in dollars: the user's figure or renovated comps; else the listing's estimated market value, labeled as such."},
+                    "after_repair_value": {"type": "number", "description": "Value after a STANDARD renovation in dollars: the user's figure or renovated comps; else the listing's estimated market value, labeled as such. Pass the same value for both plans; for the luxury plan the tool raises it automatically."},
+                    "luxury_after_repair_value": {"type": "number", "description": "Only if the user gives a value for the house after a luxury renovation (for example from luxury comps). Overrides the tool's luxury estimate."},
                     "refinance_rate_pct": {"type": "number", "description": "Refinance rate as a percent, e.g. 7.8. The user's quote, else get_mortgage_rate plus 0.75."},
                     "repair_cost": _LOAN_PROPS["repair_cost"],
                     "market_median_rent": _LOAN_PROPS["market_median_rent"],

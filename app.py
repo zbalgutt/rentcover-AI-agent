@@ -42,7 +42,9 @@ How to work:
      repair value: use the user's figure or renovated comps; otherwise the listing's estimated market value,
      labeled "listing estimate, before renovation" (a renovation may raise it, but do not assume that);
      otherwise ask the user for it and run nothing until they answer. Never use the purchase price or
-     bid as the after repair value. Use the refinance rate in place of the mortgage rate (step 3). Then call
+     bid as the after repair value. Pass the same standard value to both plans; for Luxury the tool
+     raises it automatically (pass luxury_after_repair_value only if the user gives a luxury value).
+     Use the refinance rate in place of the mortgage rate (step 3). Then call
      stress_test_cash_flow for each plan with that plan's monthly_rent and repair_cost. The app fills in
      the loan, rate and other inputs from the matching analysis automatically.
 3. Rate: use the user's lender quote, otherwise call get_mortgage_rate and add 0.75 points, because
@@ -96,7 +98,7 @@ appraisal or value uncertainty, missing condo fee, old house, the hardest stress
 result). Do not repeat the verdict.
 
 **Assumptions:** one line with the rate, down payment (or loan to value and refinance month for a
-refinance), taxes, insurance, and "28% of rent for vacancy, management and upkeep" (use the actual
+refinance, and that the Luxury value is the lower of a rent based and a cost based estimate), taxes, insurance, and "28% of rent for vacancy, management and upkeep" (use the actual
 total if changed), then "Ask me to change any."
 
 No other sections, headings, notes, disclaimers or closing questions. If the user asks for more detail
@@ -347,10 +349,17 @@ def run_agent(messages: list[dict]) -> tuple[str, list[dict]]:
 
         # The harness, not the model, runs each tool and appends the result
         for call in reply.tool_calls:
-            args = json.loads(call.function.arguments)
-            if call.function.name == "stress_test_cash_flow":
-                args = align_stress_test(args, messages)
-            result = run_tool(call.function.name, args)
+            try:
+                args = json.loads(call.function.arguments or "{}")
+            except ValueError:
+                # Malformed arguments: tell the model instead of failing the whole reply
+                args = {}
+                result = json.dumps({"error": f"The arguments for {call.function.name} were not valid JSON. "
+                                              "Call the tool again with a JSON object of arguments."})
+            else:
+                if call.function.name == "stress_test_cash_flow":
+                    args = align_stress_test(args, messages)
+                result = run_tool(call.function.name, args)
             tool_calls += [{"name": call.function.name, "args": args, "result": result}]
 
             messages += [{"role": "tool", "tool_call_id": call.id, "content": result}]
